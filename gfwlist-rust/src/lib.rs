@@ -169,8 +169,8 @@ impl GfwList {
     ///
     /// ```
     /// # use gfwlist::GfwList;
-    /// # let list_content = "||blocked-site.com\n@@||exception.com";
-    /// # let gfw_list = GfwList::from(list_content).unwrap();
+    /// let list_content = "||blocked-site.com\n@@||exception.com";
+    /// let gfw_list = GfwList::from(list_content).unwrap();
     /// assert!(gfw_list.test("http://blocked-site.com/page").unwrap());
     /// assert!(!gfw_list.test("http://exception.com/page").unwrap());
     /// assert!(!gfw_list.test("http://allowed-site.com/page").unwrap());
@@ -197,5 +197,26 @@ impl GfwList {
             return Ok(true);
         }
         Ok(false)
+    }
+
+    /// Returns the number of rules in the GfwList.
+    ///
+    /// This includes the number of positive patterns, negative patterns,
+    /// and regex patterns.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # use gfwlist::GfwList;
+    /// let list_content = "||blocked-site.com\n@@||exception.com";
+    /// let gfw_list = GfwList::from(list_content).unwrap();
+    /// assert_eq!(gfw_list.len(), 2);
+    /// ```
+    /// 
+    /// # Returns
+    /// 
+    /// Returns the total number of rules as a `usize`.
+    pub fn len(&self) -> usize {
+        self.positive_ac.patterns_len() + self.negative_ac.patterns_len() + self.regex_patterns.len()
     }
 }
