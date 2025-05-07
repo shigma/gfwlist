@@ -1,28 +1,47 @@
+#![doc = include_str!("../README.md")]
+
 use aho_corasick::AhoCorasick;
 use url::Url;
 use regex::Regex;
 
 mod constants {
+    /// Marker byte for the beginning of a URL scheme
     pub const BEGIN_OF_SCHEME: u8 = 0x01;
+    /// Marker byte for the beginning of a host
     pub const BEGIN_OF_HOST: u8 = 0x02;
+    /// Marker byte for the beginning of a path
     pub const BEGIN_OF_PATH: u8 = 0x03;
+    /// Delimiter byte for host components
     pub const HOST_DELIMITER: u8 = b'.';
+    /// Delimiter byte for path components
     pub const PATH_DELIMITER: u8 = b'/';
 }
 
+/// Errors that can occur when building a GfwList.
 #[derive(Debug)]
 pub enum BuildError<'i> {
+    /// Error related to syntax issues in a rule
     Syntax(&'i str, SyntaxError),
+    /// Error from the Aho-Corasick algorithm during pattern compilation
     AhoCorasick(aho_corasick::BuildError),
 }
 
+/// Specific syntax errors encountered during GfwList parsing
 #[derive(Debug)]
 pub enum SyntaxError {
+    /// General rule syntax error
     Rule(),
+    /// Error in a regular expression
     Regex(regex::Error),
+    /// Error parsing a URL
     Url(url::ParseError),
 }
 
+/// `GfwList` represents a compiled set of rules for matching URLs.
+///
+/// It uses Aho-Corasick for fast pattern matching and regular expressions
+/// for more complex matching. Rules can be either positive (block) or
+/// negative (allow) patterns.
 #[derive(Debug)]
 pub struct GfwList {
     positive_ac: AhoCorasick,
@@ -64,6 +83,31 @@ fn append_url(acc: &mut Vec<u8>, input: &str) -> Result<(), url::ParseError> {
 }
 
 impl GfwList {
+    /// Constructs a new `GfwList` from a string containing GFW list rules.
+    ///
+    /// The input string should follow the GFW list format, with each line containing
+    /// a rule. Rules can be:
+    /// - Regular expressions: `/pattern/`
+    /// - Negative patterns: `@@pattern` (whitelist)
+    /// - Positive patterns: `pattern` (blacklist)
+    /// - Patterns with different formats: `.example.com`, `||example.com`, etc.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use gfwlist::GfwList;
+    /// let list_content = "\
+    ///     ||blocked-site.com\n\
+    ///     @@||exception.com\n\
+    ///     /regex-pattern/\n\
+    /// ";
+    /// let gfw_list = GfwList::from(list_content).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a `BuildError` if any of the rules have invalid syntax or if
+    /// there's an issue building the pattern matchers.
     pub fn from(input: &str) -> Result<Self, BuildError> {
         let mut positive_patterns: Vec<Vec<u8>> = vec![];
         let mut negative_patterns: Vec<Vec<u8>> = vec![];
@@ -114,6 +158,32 @@ impl GfwList {
         })
     }
 
+    /// Tests whether a URL matches any rule in the GfwList.
+    ///
+    /// The test follows these steps:
+    /// 1. Check if the URL matches any regex pattern
+    /// 2. Check if the URL matches any negative (whitelist) pattern
+    /// 3. Check if the URL matches any positive (blacklist) pattern
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use gfwlist::GfwList;
+    /// # let list_content = "||blocked-site.com\n@@||exception.com";
+    /// # let gfw_list = GfwList::from(list_content).unwrap();
+    /// assert!(gfw_list.test("http://blocked-site.com/page").unwrap());
+    /// assert!(!gfw_list.test("http://exception.com/page").unwrap());
+    /// assert!(!gfw_list.test("http://allowed-site.com/page").unwrap());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a `url::ParseError` if the input cannot be parsed as a valid URL.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the URL should be blocked according to the rules,
+    /// or `false` if it should be allowed.
     pub fn test(&self, input: &str) -> Result<bool, url::ParseError> {
         if self.regex_patterns.iter().any(|regex| regex.is_match(input)) {
             return Ok(true);

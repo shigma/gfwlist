@@ -2,6 +2,13 @@
 name = "gfwlist"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+authors = [
+    "Shigma <shigma10826@gmail.com>",
+]
+description = "A GFW list parser and matcher."
+repository = "https://github.com/shigma/gfwlist"
+documentation = "https://docs.rs/gfwlist"
 
 [dependencies]
 aho-corasick = "1.1.3"
