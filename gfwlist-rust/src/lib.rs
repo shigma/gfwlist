@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 
 use aho_corasick::AhoCorasick;
 use url::Url;
