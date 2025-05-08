@@ -149,7 +149,7 @@ impl GfwList {
             } else if line.get(1) == Some(&b'|') {
                 append_host_path(&mut needle, &line[2..]);
             } else {
-                append_url(&mut needle, line_str).map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
+                append_url(&mut needle,& line_str[1..]).map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
             }
             patterns.push(needle);
         }
