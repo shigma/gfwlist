@@ -3,6 +3,22 @@ use pyo3::exceptions::{PyValueError, PyRuntimeError};
 use pyo3::create_exception;
 use gfwlist::{BuildError, GfwList};
 
+#[pymodule]
+#[pyo3(name="gfwlist")]
+fn pygfwlist(py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<PyGfwList>()?;
+
+    // Register the custom exceptions
+    m.add("GfwListSyntaxError", py.get_type::<GfwListSyntaxError>())?;
+    m.add("GfwListBuildError", py.get_type::<GfwListBuildError>())?;
+    m.add("GfwListUrlError", py.get_type::<GfwListUrlError>())?;
+
+    // Add module docstring
+    m.add("__doc__", "Python bindings for the GfwList Rust library that processes URL filtering rules.")?;
+
+    Ok(())
+}
+
 // Custom Python exceptions
 create_exception!(pygfwlist, GfwListSyntaxError, PyValueError);
 create_exception!(pygfwlist, GfwListBuildError, PyRuntimeError);
