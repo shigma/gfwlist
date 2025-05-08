@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "gfwlist"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "aho-corasick",
  "regex",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "gfwlist-python"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "gfwlist",
  "pyo3",

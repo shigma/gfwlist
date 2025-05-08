@@ -46,7 +46,8 @@ pub enum SyntaxError {
 pub struct GfwList {
     positive_ac: AhoCorasick,
     negative_ac: AhoCorasick,
-    regex_patterns: Vec<Regex>,
+    positive_rules: Vec<String>,
+    regex_patterns: Vec<(Regex, String)>,
 }
 
 fn append_host(acc: &mut Vec<u8>, host: &[u8]) {
@@ -106,15 +107,12 @@ impl GfwList {
     /// ";
     /// let gfw_list = GfwList::from(list_content).unwrap();
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns a `BuildError` if any of the rules have invalid syntax or if
-    /// there's an issue building the pattern matchers.
     pub fn from(input: &str) -> Result<Self, BuildError> {
+        let mut positive_rules: Vec<String> = vec![];
+        let mut negative_rules: Vec<String> = vec![];
         let mut positive_patterns: Vec<Vec<u8>> = vec![];
         let mut negative_patterns: Vec<Vec<u8>> = vec![];
-        let mut regex_patterns: Vec<Regex> = vec![];
+        let mut regex_patterns: Vec<(Regex, String)> = vec![];
         // split the source into lines
         for mut line_str in input.lines() {
             // skip empty lines and comments
@@ -127,17 +125,17 @@ impl GfwList {
                 }
                 let regex = Regex::new(&line_str[1..line_str.len() - 1])
                     .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Regex(e)))?;
-                regex_patterns.push(regex);
+                regex_patterns.push((regex, line_str.to_string()));
                 continue;
             }
-            let patterns = if line_str.starts_with("@") {
+            let (patterns, rules) = if line_str.starts_with("@") {
                 if line_str.len() == 1 || !line_str.starts_with("@@") {
                     return Err(BuildError::Syntax(line_str, SyntaxError::Rule()));
                 }
                 line_str = &line_str[2..];
-                &mut negative_patterns
+                (&mut negative_patterns, &mut negative_rules)
             } else {
-                &mut positive_patterns
+                (&mut positive_patterns, &mut positive_rules)
             };
             let line = line_str.as_bytes();
             let mut needle: Vec<u8> = vec![];
@@ -149,13 +147,16 @@ impl GfwList {
             } else if line.get(1) == Some(&b'|') {
                 append_host_path(&mut needle, &line[2..]);
             } else {
-                append_url(&mut needle,& line_str[1..]).map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
+                append_url(&mut needle, &line_str[1..])
+                    .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
             }
             patterns.push(needle);
+            rules.push(line_str.to_string());
         }
         Ok(GfwList {
             positive_ac: AhoCorasick::new(positive_patterns).map_err(BuildError::AhoCorasick)?,
             negative_ac: AhoCorasick::new(negative_patterns).map_err(BuildError::AhoCorasick)?,
+            positive_rules,
             regex_patterns,
         })
     }
@@ -167,38 +168,33 @@ impl GfwList {
     /// 2. Check if the URL matches any negative (whitelist) pattern
     /// 3. Check if the URL matches any positive (blacklist) pattern
     ///
+    /// Returns `Some(rule)` if the URL matches a rule, `None` if it doesn't match any rules.
+    ///
     /// # Examples
     ///
     /// ```
     /// # use gfwlist::GfwList;
     /// let list_content = "||blocked-site.com\n@@||exception.com";
     /// let gfw_list = GfwList::from(list_content).unwrap();
-    /// assert!(gfw_list.test("http://blocked-site.com/page").unwrap());
-    /// assert!(!gfw_list.test("http://exception.com/page").unwrap());
-    /// assert!(!gfw_list.test("http://allowed-site.com/page").unwrap());
+    /// assert_eq!(gfw_list.test("http://blocked-site.com/page").unwrap(), Some("||blocked-site.com"));
+    /// assert_eq!(gfw_list.test("http://exception.com/page").unwrap(), None);
+    /// assert_eq!(gfw_list.test("http://allowed-site.com/page").unwrap(), None);
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns a `url::ParseError` if the input cannot be parsed as a valid URL.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the URL should be blocked according to the rules,
-    /// or `false` if it should be allowed.
-    pub fn test(&self, input: &str) -> Result<bool, url::ParseError> {
-        if self.regex_patterns.iter().any(|regex| regex.is_match(input)) {
-            return Ok(true);
+    pub fn test(&self, input: &str) -> Result<Option<&str>, url::ParseError> {
+        for (regex, rule) in &self.regex_patterns {
+            if regex.is_match(input) {
+                return Ok(Some(rule));
+            }
         }
         let mut haystack: Vec<u8> = vec![];
         append_url(&mut haystack, input)?;
-        if self.negative_ac.find(&haystack).is_some() {
-            return Ok(false);
+        if let Some(_) = self.negative_ac.find(&haystack) {
+            return Ok(None);
         }
-        if self.positive_ac.find(&haystack).is_some() {
-            return Ok(true);
+        if let Some(match_) = self.positive_ac.find(&haystack) {
+            return Ok(Some(&self.positive_rules[match_.pattern().as_usize()]));
         }
-        Ok(false)
+        Ok(None)
     }
 
     /// Returns the number of rules in the GfwList.
