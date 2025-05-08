@@ -1,8 +1,8 @@
 #![doc = include_str!("../../README.md")]
 
 use aho_corasick::AhoCorasick;
-use url::Url;
 use regex::Regex;
+use url::Url;
 
 mod constants {
     /// Marker byte for the beginning of a URL scheme
@@ -64,7 +64,10 @@ fn append_path(acc: &mut Vec<u8>, path: &[u8]) {
 }
 
 fn append_host_path(acc: &mut Vec<u8>, input: &[u8]) {
-    let pos = input.iter().position(|&b| b == constants::PATH_DELIMITER).unwrap_or(input.len());
+    let pos = input
+        .iter()
+        .position(|&b| b == constants::PATH_DELIMITER)
+        .unwrap_or(input.len());
     append_host(acc, &input[..pos]);
     acc.push(constants::BEGIN_OF_PATH);
     append_path(acc, &input[pos..]);
@@ -142,12 +145,11 @@ impl GfwList {
                 append_host_path(&mut needle, &line[1..]);
             } else if line[0] != b'|' {
                 needle.push(constants::BEGIN_OF_HOST);
-                append_host_path(&mut needle, &line);
+                append_host_path(&mut needle, line);
             } else if line.get(1) == Some(&b'|') {
                 append_host_path(&mut needle, &line[2..]);
             } else {
-                append_url(&mut needle, line_str)
-                    .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
+                append_url(&mut needle, line_str).map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
             }
             patterns.push(needle);
         }
@@ -203,20 +205,33 @@ impl GfwList {
     ///
     /// This includes the number of positive patterns, negative patterns,
     /// and regex patterns.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use gfwlist::GfwList;
     /// let list_content = "||blocked-site.com\n@@||exception.com";
     /// let gfw_list = GfwList::from(list_content).unwrap();
     /// assert_eq!(gfw_list.len(), 2);
     /// ```
-    /// 
-    /// # Returns
-    /// 
-    /// Returns the total number of rules as a `usize`.
     pub fn len(&self) -> usize {
         self.positive_ac.patterns_len() + self.negative_ac.patterns_len() + self.regex_patterns.len()
+    }
+
+    /// Checks if the GfwList is empty.
+    ///
+    /// This includes the number of positive patterns, negative patterns,
+    /// and regex patterns.
+    /// 
+    /// # Examples
+    ///
+    /// ```
+    /// # use gfwlist::GfwList;
+    /// let list_content = "\n\n";
+    /// let gfw_list = GfwList::from(list_content).unwrap();
+    /// assert_eq!(gfw_list.is_empty(), true);
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
