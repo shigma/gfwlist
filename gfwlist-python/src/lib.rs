@@ -8,18 +8,15 @@ use pyo3::prelude::*;
 fn pygfwlist(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGfwList>()?;
 
-    // Register the custom exceptions
     m.add("GfwListSyntaxError", py.get_type::<GfwListSyntaxError>())?;
     m.add("GfwListBuildError", py.get_type::<GfwListBuildError>())?;
     m.add("GfwListUrlError", py.get_type::<GfwListUrlError>())?;
 
-    // Add module docstring
     m.add("__doc__", "A GFW list parser and matcher.")?;
 
     Ok(())
 }
 
-// Custom Python exceptions
 create_exception!(pygfwlist, GfwListSyntaxError, PyValueError);
 create_exception!(pygfwlist, GfwListBuildError, PyRuntimeError);
 create_exception!(pygfwlist, GfwListUrlError, PyValueError);
@@ -48,12 +45,9 @@ impl PyGfwList {
         match GfwList::from(rules_text) {
             Ok(gfw_list) => Ok(PyGfwList { inner: gfw_list }),
             Err(err) => match err {
-                BuildError::Syntax(rule, _) => {
-                    Err(GfwListSyntaxError::new_err(format!("Invalid rule syntax: {}", rule)))
-                }
+                BuildError::Syntax(rule, _) => Err(GfwListSyntaxError::new_err(format!("Invalid rule syntax: {rule}"))),
                 BuildError::AhoCorasick(err) => Err(GfwListBuildError::new_err(format!(
-                    "Failed to build pattern matcher: {}",
-                    err
+                    "Failed to build pattern matcher: {err}",
                 ))),
             },
         }
@@ -72,7 +66,7 @@ impl PyGfwList {
     fn test(&self, url: &str) -> PyResult<bool> {
         match self.inner.test(url) {
             Ok(result) => Ok(result),
-            Err(err) => Err(GfwListUrlError::new_err(format!("Invalid URL: {}", err))),
+            Err(err) => Err(GfwListUrlError::new_err(format!("Invalid URL: {err}"))),
         }
     }
 
