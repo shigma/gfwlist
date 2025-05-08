@@ -5,7 +5,7 @@ use gfwlist::{BuildError, GfwList};
 
 #[pymodule]
 #[pyo3(name="gfwlist")]
-fn pygfwlist(py: Python, m: &PyModule) -> PyResult<()> {
+fn pygfwlist(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGfwList>()?;
 
     // Register the custom exceptions
