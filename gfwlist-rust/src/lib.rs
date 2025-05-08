@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 
 use aho_corasick::AhoCorasick;
 use regex::Regex;
@@ -222,7 +222,7 @@ impl GfwList {
     ///
     /// This includes the number of positive patterns, negative patterns,
     /// and regex patterns.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
