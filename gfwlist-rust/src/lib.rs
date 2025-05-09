@@ -188,7 +188,7 @@ impl GfwList {
         }
         let mut haystack: Vec<u8> = vec![];
         append_url(&mut haystack, input)?;
-        if let Some(_) = self.negative_ac.find(&haystack) {
+        if self.negative_ac.find(&haystack).is_some() {
             return Ok(None);
         }
         if let Some(match_) = self.positive_ac.find(&haystack) {

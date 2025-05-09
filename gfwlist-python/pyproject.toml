@@ -1,6 +1,6 @@
 [project]
 name = "gfwlist"
-description = "A GFW list parser and matcher."
+description = "A fast GFW list parser and matcher."
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
