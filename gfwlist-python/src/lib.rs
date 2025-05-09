@@ -31,7 +31,7 @@ impl PyGfwList {
     #[new]
     fn new(rules_text: &str) -> PyResult<Self> {
         match GfwList::from(rules_text) {
-            Ok(gfw_list) => Ok(PyGfwList { inner: gfw_list }),
+            Ok(gfw) => Ok(PyGfwList { inner: gfw }),
             Err(err) => match err {
                 BuildError::Syntax(rule, _) => Err(GfwListSyntaxError::new_err(format!("Invalid rule syntax: {rule}"))),
                 BuildError::AhoCorasick(err) => Err(GfwListBuildError::new_err(format!(

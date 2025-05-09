@@ -74,15 +74,18 @@ fn append_host_path(acc: &mut Vec<u8>, input: &[u8]) {
     append_path(acc, &input[pos..]);
 }
 
-fn append_url(acc: &mut Vec<u8>, input: &str) -> Result<(), url::ParseError> {
+fn append_url<const FULL_MODE: bool>(acc: &mut Vec<u8>, input: &str) -> Result<(), url::ParseError> {
     let url = Url::parse(input)?;
     let host_str = url.host_str().ok_or(url::ParseError::EmptyHost)?;
     acc.push(constants::BEGIN_OF_SCHEME);
     acc.extend(url.scheme().as_bytes());
     acc.push(constants::BEGIN_OF_HOST);
     append_host(acc, host_str.as_bytes());
-    acc.push(constants::BEGIN_OF_PATH);
-    append_path(acc, url.path().as_bytes());
+    let path = url.path();
+    if FULL_MODE || path != "/" || input.ends_with('/') {
+        acc.push(constants::BEGIN_OF_PATH);
+        append_path(acc, url.path().as_bytes());
+    }
     Ok(())
 }
 
@@ -128,10 +131,7 @@ impl GfwList {
                 regex_patterns.push((regex, line_str.to_string()));
                 continue;
             }
-            let (patterns, rules) = if line_str.starts_with("@") {
-                if line_str.len() == 1 || !line_str.starts_with("@@") {
-                    return Err(BuildError::Syntax(line_str, SyntaxError::Rule()));
-                }
+            let (patterns, rules) = if line_str.starts_with("@@") {
                 line_str = &line_str[2..];
                 (&mut negative_patterns, &mut negative_rules)
             } else {
@@ -147,7 +147,7 @@ impl GfwList {
             } else if line.get(1) == Some(&b'|') {
                 append_host_path(&mut needle, &line[2..]);
             } else {
-                append_url(&mut needle, &line_str[1..])
+                append_url::<false>(&mut needle, &line_str[1..])
                     .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
             }
             patterns.push(needle);
@@ -187,7 +187,7 @@ impl GfwList {
             }
         }
         let mut haystack: Vec<u8> = vec![];
-        append_url(&mut haystack, input)?;
+        append_url::<true>(&mut haystack, input)?;
         if self.negative_ac.find(&haystack).is_some() {
             return Ok(None);
         }
@@ -229,5 +229,54 @@ impl GfwList {
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+// https://github.com/gfwlist/gfwlist/wiki/Syntax
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_1() {
+        let gfw = GfwList::from("|http://example.com").unwrap();
+
+        assert!(gfw.test("http://example.com").unwrap().is_some());
+        assert!(gfw.test("http://example.com/page").unwrap().is_some());
+        assert!(gfw.test("http://example.com.co").unwrap().is_some());
+
+        assert!(gfw.test("http://www.example.com").unwrap().is_none());
+        assert!(gfw.test("https://example.com/page").unwrap().is_none());
+        assert!(gfw.test("https://example.com").unwrap().is_none());
+        assert!(gfw.test("https://www.example.com").unwrap().is_none());
+        assert!(gfw.test("https://example.com.co").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_2() {
+        let gfw = GfwList::from("||example.com").unwrap();
+
+        assert!(gfw.test("http://example.com").unwrap().is_some());
+        assert!(gfw.test("http://www.example.com").unwrap().is_some());
+        assert!(gfw.test("https://example.com").unwrap().is_some());
+        assert!(gfw.test("https://www.example.com").unwrap().is_some());
+
+        assert!(gfw.test("http://anotherexample.com").unwrap().is_none());
+        assert!(gfw.test("https://anotherexample.com").unwrap().is_none());
+        assert!(gfw.test("http://example.com.co").unwrap().is_none());
+        assert!(gfw.test("https://example.com.co").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_3() {
+        let gfw = GfwList::from(".example.com\n@@|http://sub.example.com").unwrap();
+
+        assert!(gfw.test("http://example.com").unwrap().is_some());
+        assert!(gfw.test("http://www.sub.example.com").unwrap().is_some());
+        assert!(gfw.test("https://sub.example.com").unwrap().is_some());
+        assert!(gfw.test("https://www.example.com").unwrap().is_some());
+
+        assert!(gfw.test("http://sub.example.com").unwrap().is_none());
+        assert!(gfw.test("http://sub.example.com/page").unwrap().is_none());
     }
 }

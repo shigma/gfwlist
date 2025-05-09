@@ -18,9 +18,9 @@ list_content = """
 @@||exception.com
 /regex-pattern/
 """
-gfwlist = GFWList(list_content)
+gfw = GFWList(list_content)
 
-assert gfwlist.test("http://blocked-site.com/page") == "||blocked-site.com"
-assert gfwlist.test("http://exception.com/page") is None
-assert gfwlist.test("http://allowed-site.com/page") is None
+assert gfw.test("http://blocked-site.com/page") == "||blocked-site.com"
+assert gfw.test("http://exception.com/page") is None
+assert gfw.test("http://allowed-site.com/page") is None
 ```
