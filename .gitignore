@@ -2,5 +2,6 @@
 __pycache__
 
 *.so
+.vscode
 
 /target

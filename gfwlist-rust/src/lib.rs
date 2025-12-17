@@ -2,6 +2,7 @@
 
 use aho_corasick::AhoCorasick;
 use regex::Regex;
+use thiserror::Error;
 use url::Url;
 
 mod constants {
@@ -18,22 +19,27 @@ mod constants {
 }
 
 /// Errors that can occur when building a GfwList.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BuildError<'i> {
     /// Error related to syntax issues in a rule
+    #[error("Syntax error in rule: {1}")]
     Syntax(&'i str, SyntaxError),
     /// Error from the Aho-Corasick algorithm during pattern compilation
+    #[error("Error building Aho-Corasick: {0}")]
     AhoCorasick(aho_corasick::BuildError),
 }
 
 /// Specific syntax errors encountered during GfwList parsing
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum SyntaxError {
     /// General rule syntax error
+    #[error("Syntax error in rule")]
     Rule(),
     /// Error in a regular expression
+    #[error("Error parsing regular expression: {0}")]
     Regex(regex::Error),
     /// Error parsing a URL
+    #[error("Error parsing URL: {0}")]
     Url(url::ParseError),
 }
 
@@ -110,7 +116,7 @@ impl GfwList {
     /// ";
     /// let gfw_list = GfwList::from(list_content).unwrap();
     /// ```
-    pub fn from(input: &str) -> Result<Self, BuildError> {
+    pub fn from(input: &str) -> Result<Self, BuildError<'_>> {
         let mut positive_rules: Vec<String> = vec![];
         let mut negative_rules: Vec<String> = vec![];
         let mut positive_patterns: Vec<Vec<u8>> = vec![];
