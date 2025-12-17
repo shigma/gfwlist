@@ -20,26 +20,26 @@ mod constants {
 
 /// Errors that can occur when building a GfwList.
 #[derive(Debug, Error)]
-pub enum BuildError<'i> {
+pub enum BuildError {
     /// Error related to syntax issues in a rule
-    #[error("Syntax error in rule: {1}")]
-    Syntax(&'i str, SyntaxError),
+    #[error("syntax error at line {0}: {1}")]
+    Syntax(usize, SyntaxError),
     /// Error from the Aho-Corasick algorithm during pattern compilation
-    #[error("Error building Aho-Corasick: {0}")]
-    AhoCorasick(aho_corasick::BuildError),
+    #[error("error building Aho-Corasick: {0}")]
+    AhoCorasick(#[from] aho_corasick::BuildError),
 }
 
 /// Specific syntax errors encountered during GfwList parsing
 #[derive(Debug, Error)]
 pub enum SyntaxError {
     /// General rule syntax error
-    #[error("Syntax error in rule")]
-    Rule(),
+    #[error("invalid rule syntax")]
+    Rule,
     /// Error in a regular expression
-    #[error("Error parsing regular expression: {0}")]
+    #[error("error parsing regular expression: {0}")]
     Regex(regex::Error),
     /// Error parsing a URL
-    #[error("Error parsing URL: {0}")]
+    #[error("error parsing URL: {0}")]
     Url(url::ParseError),
 }
 
@@ -116,24 +116,24 @@ impl GfwList {
     /// ";
     /// let gfw_list = GfwList::from(list_content).unwrap();
     /// ```
-    pub fn from(input: &str) -> Result<Self, BuildError<'_>> {
+    pub fn from(input: &str) -> Result<Self, BuildError> {
         let mut positive_rules: Vec<String> = vec![];
         let mut negative_rules: Vec<String> = vec![];
         let mut positive_patterns: Vec<Vec<u8>> = vec![];
         let mut negative_patterns: Vec<Vec<u8>> = vec![];
         let mut regex_patterns: Vec<(Regex, String)> = vec![];
         // split the source into lines
-        for mut line_str in input.lines() {
+        for (line_index, mut line_str) in input.lines().enumerate() {
             // skip empty lines and comments
             if line_str.is_empty() || line_str.starts_with('!') {
                 continue;
             }
             if line_str.starts_with('/') {
                 if line_str.len() == 1 || !line_str.ends_with('/') {
-                    return Err(BuildError::Syntax(line_str, SyntaxError::Rule()));
+                    return Err(BuildError::Syntax(line_index, SyntaxError::Rule));
                 }
                 let regex = Regex::new(&line_str[1..line_str.len() - 1])
-                    .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Regex(e)))?;
+                    .map_err(|e| BuildError::Syntax(line_index, SyntaxError::Regex(e)))?;
                 regex_patterns.push((regex, line_str.to_string()));
                 continue;
             }
@@ -154,7 +154,7 @@ impl GfwList {
                 append_host_path(&mut needle, &line[2..]);
             } else {
                 append_url::<false>(&mut needle, &line_str[1..])
-                    .map_err(|e| BuildError::Syntax(line_str, SyntaxError::Url(e)))?;
+                    .map_err(|e| BuildError::Syntax(line_index, SyntaxError::Url(e)))?;
             }
             patterns.push(needle);
             rules.push(line_str.to_string());
